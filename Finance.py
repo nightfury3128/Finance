@@ -123,7 +123,7 @@ def signin():
             # Fetch user data
             df = pd.read_excel('users_data.xlsx')
             user_data = df.loc[df['Username'] == username].iloc[0]
-            symbols = user_data['Stock Symbols'].split(', ')
+            symbols = user_data['Stock'].split(', ')
             total_stock_value = sum(get_current_stock_price(symbol) for symbol in symbols)
             monthly_income = user_data['Monthly Income']
             net_worth = total_stock_value + monthly_income  # Simplified net worth calculation
