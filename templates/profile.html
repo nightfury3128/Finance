@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container">
+    <h2 class="my-4">Profile Page</h2>
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Monthly Income: ${{ monthly_income }}</h5>
+            <p class="card-text">Total Value of Stocks Owned: ${{ total_stock_value }}</p>
+            <p class="card-text">Net Worth: ${{ net_worth }}</p>
+            <h6 class="mt-3">Stocks Owned:</h6>
+            <ul>
+                {% for symbol in symbols %}
+                <li>{{ symbol }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+</body>
+</html>
