@@ -1,10 +1,10 @@
-from flask import Flask, request, render_template, redirect, url_for
+from flask import Flask, render_template, redirect, url_for, session, request
 import pandas as pd
-import openpyxl
 import os
 import requests
 
 app = Flask(__name__)
+app.secret_key = 'your_secret_key'  # Set a secret key for session management
 
 API_KEY = '2EJ4D4oNPhYy4RoOPDZb2Qy9G1UfmI6c'  # Financial Modeling Prep API Key
 
@@ -114,28 +114,53 @@ def register():
         return redirect(url_for('signin'))
     return render_template('register.html')
 @app.route('/signin', methods=['GET', 'POST'])
-@app.route('/signin', methods=['GET', 'POST'])
 def signin():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         if validate_credentials(username, password):
-            # Fetch user data
-            df = pd.read_excel('users_data.xlsx')
-            user_data = df.loc[df['Username'] == username].iloc[0]
-            symbols = user_data['Stock'].split(', ')
-            total_stock_value = sum(get_current_stock_price(symbol) for symbol in symbols)
-            monthly_income = user_data['Monthly Income']
-            net_worth = total_stock_value + monthly_income  # Simplified net worth calculation
-            # Pass data to the profile page
-            return render_template('profile.html', monthly_income=monthly_income, total_stock_value=total_stock_value, net_worth=net_worth, symbols=symbols)
+            session['username'] = username  # Set session
+            return redirect(url_for('profile'))  # Redirect to a profile route
         else:
             return 'Invalid Username or Password!'
     return render_template('signin.html')
 
+# Define a new route for the profile page
+@app.route('/profile')
+@app.route('/profile')
+def profile():
+    if 'username' in session:
+        username = session['username']
+        # Fetch user data
+        df = pd.read_excel('users_data.xlsx')
+        user_data = df.loc[df['Username'] == username].iloc[0]
+        symbols = user_data['Stock'].split(', ')
+        
+        # Calculate total stock value and total profit
+        total_stock_value = 0
+        total_profit = 0
+        for symbol in symbols:
+            current_price = get_current_stock_price(symbol)
+            # Assuming the purchase price and number of shares are stored in the user_data
+            purchase_price = ...  # Fetch from user_data
+            num_shares = ...  # Fetch from user_data
+            total_stock_value += current_price * num_shares
+            total_profit += (current_price - purchase_price) * num_shares
+        
+        monthly_income = user_data['Monthly Income']
+        net_worth = total_stock_value + monthly_income  # Simplified net worth calculation
+        
+        return render_template('profile.html', monthly_income=monthly_income, total_stock_value=total_stock_value, net_worth=net_worth, symbols=symbols, total_profit=total_profit)
+    else:
+        return redirect(url_for('signin'))
+
+@app.route('/signout')
+def sign_out():
+    session.clear()  # Clear the user's session
+    return redirect(url_for('signin'))
+
 @app.route('/')
 def home():
-    return redirect(url_for('register'))
-
+    return redirect(url_for('signin'))
 if __name__ == '__main__':
     app.run(debug=True)
