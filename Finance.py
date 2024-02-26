@@ -92,11 +92,15 @@ def save_to_excel(email, name, dob, income, country, stocks, username, password,
         df.to_excel(writer, sheet_name='Sheet1', startrow=startrow, index=False, header=False)
         
         writer.save()
-
 def validate_credentials(username, password, filename='users_data.xlsx'):
     try:
         df = pd.read_excel(filename)
-        user_row = df.loc[df['Username'] == username]
+        df['Username'] = df['Username'].astype(str)
+        df['Password'] = df['Password'].astype(str)
+
+        # Case-insensitive comparison
+        user_row = df.loc[df['Username'].str.lower() == username.lower()]
+
         if not user_row.empty and user_row.iloc[0]['Password'] == password:
             return True
         else:
@@ -104,31 +108,39 @@ def validate_credentials(username, password, filename='users_data.xlsx'):
     except FileNotFoundError:
         return False
 
+def save_user_data(email, username, stocks, shares, invested):
+    wb = load_workbook('users_data.xlsx')
+    users_sheet = wb['Users']
+    stocks_sheet = wb['Stocks']
+
+    # Add user to 'Users' sheet
+    users_sheet.append([email, username])
+    # Add stocks to 'Stocks' sheet
+    for stock_name, share, invest in zip(stocks, shares, invested):
+        stocks_sheet.append([username, stock_name, share, invest])
+
+    wb.save('users_data.xlsx')
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        email = request.form.get('email')
-        name = request.form.get('name')
-        dob = request.form.get('dob')
-        income = request.form.get('income')
-        country = request.form.get('country')
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
-        # Extract stocks data as before
-        stocks = []
-        for key in request.form:
-            if key.startswith('stocks['):
-                index, field = key.strip(']').split('[')[1:]
-                index = int(index)
-                while index >= len(stocks):
-                    stocks.append({'name': '', 'shares': 0, 'invested': 0.0})
-                stocks[index][field] = request.form[key]
-        
-        save_to_excel(email, name, dob, income, country, stocks, username, password)
-        
-        return redirect(url_for('register'))
+        # User details
+        email = request.form['email']
+        username = request.form['username']
+        # Other user details processing
+
+        # Process stocks data from form
+        stocks = request.form.getlist('stocks[name]')
+        shares = request.form.getlist('stocks[shares]')
+        invested = request.form.getlist('stocks[invested]')
+
+        # Save user and stocks data to Excel
+        save_user_data(email, username, stocks, shares, invested)
+
+        # Redirect to profile or another page after registration
+        return redirect(url_for('profile'))
     return render_template('register.html')
+
 @app.route('/signin', methods=['GET', 'POST'])
 def signin():
     if request.method == 'POST':
@@ -144,29 +156,47 @@ def signin():
 # Define a new route for the profile page
 @app.route('/profile')
 @app.route('/profile')
+@app.route('/profile')
 def profile():
     if 'username' in session:
         username = session['username']
         # Fetch user data
-        df = pd.read_excel('users_data.xlsx')
-        user_data = df.loc[df['Username'] == username].iloc[0]
-        symbols = user_data['Stock'].split(', ')
-        
-        # Calculate total stock value and total profit
+        df_users = pd.read_excel('users_data.xlsx', sheet_name='Users')
+        user_data = df_users[df_users['Username'].str.lower() == username.lower()].iloc[0]
+        monthly_income = user_data['Monthly Income']
+
+        # Assuming stocks information is stored in a separate sheet or structured format
+        df_stocks = pd.read_excel('users_data.xlsx', sheet_name='Stocks')
+        user_stocks = df_stocks[df_stocks['Username'].str.lower() == username.lower()]
+
         total_stock_value = 0
         total_profit = 0
-        for symbol in symbols:
+        stocks_info = []
+
+        for _, row in user_stocks.iterrows():
+            symbol = row['StockName']
+            num_shares = row['Shares']
+            purchase_price = row['InvestedAmount'] / num_shares if num_shares else 0
             current_price = get_current_stock_price(symbol)
-            # Assuming the purchase price and number of shares are stored in the user_data
-            purchase_price = ...  # Fetch from user_data
-            num_shares = ...  # Fetch from user_data
-            total_stock_value += current_price * num_shares
-            total_profit += (current_price - purchase_price) * num_shares
-        
-        monthly_income = user_data['Monthly Income']
+
+            if current_price is not None:
+                stock_value = current_price * num_shares
+                profit = (current_price - purchase_price) * num_shares
+
+                total_stock_value += stock_value
+                total_profit += profit
+
+                stocks_info.append({
+                    'symbol': symbol,
+                    'num_shares': num_shares,
+                    'purchase_price': purchase_price,
+                    'current_price': current_price,
+                    'profit': profit
+                })
+
         net_worth = total_stock_value + monthly_income  # Simplified net worth calculation
-        
-        return render_template('profile.html', monthly_income=monthly_income, total_stock_value=total_stock_value, net_worth=net_worth, symbols=symbols, total_profit=total_profit)
+
+        return render_template('profile.html', username=username, monthly_income=monthly_income, total_stock_value=total_stock_value, net_worth=net_worth, stocks_info=stocks_info, total_profit=total_profit)
     else:
         return redirect(url_for('signin'))
 
